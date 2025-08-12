@@ -1,37 +1,39 @@
 from __future__ import annotations
 
 import datetime as dt
+from collections.abc import Callable
+from datetime import timezone
+from typing import ParamSpec, TypeVar, cast
 
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 import yfinance as yf
 
-# Page layout: wide + no page scroll, large centered chart
-st.set_page_config(page_title="Time Series Plotter", page_icon="📈", layout="wide")
+P = ParamSpec("P")
+R = TypeVar("R")
+
+
+def fragment(func: Callable[P, R]) -> Callable[P, R]:
+    """
+    Wrapper that uses st.fragment if available; otherwise a no-op.
+    Preserves the signature of the wrapped function for type checkers.
+    """
+    st_fragment = getattr(st, "fragment", None)
+    if st_fragment is None:
+        return func
+    # st.fragment is a decorator; cast it to the compatible callable type
+    return cast(Callable[[Callable[P, R]], Callable[P, R]], st_fragment)(func)
+
+
+# --- Minimal, safer CSS (avoid data-testid & global overflow locks) ---
 st.markdown(
     """
     <style>
-      /* Lock app to viewport height and prevent scrolling */
-      html, body, [data-testid="stAppViewContainer"], [data-testid="stAppViewBlockContainer"] {
-        height: 100vh !important; overflow: hidden !important;
-      }
-      /* So the canvas uses the screen well */
       .block-container { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+      .underlabel { margin-top: 0rem; font-size: 0.85rem; opacity: 0.75; }
     </style>
     """,
-    unsafe_allow_html=True,
-)
-# Tighten spacing beneath widgets and style our custom under-labels
-st.markdown(
-    """
-<style>
-/* Reduce extra space under all Streamlit widgets */
-[data-testid="stWidget"] { margin-bottom: 0.25rem !important; }
-/* Compact label that sits right under the widget */
-.underlabel { margin-top: 0.rem; font-size: 0.85rem; opacity: 0.75; }
-</style>
-""",
     unsafe_allow_html=True,
 )
 
@@ -43,27 +45,26 @@ def underlabel(widget_fn, label, *args, **kwargs):
     return val
 
 
-# Session state
-if "loaded_time_series" not in st.session_state:
-    st.session_state.loaded_time_series = []
-if "loaded_time_series_names" not in st.session_state:
-    st.session_state.loaded_time_series_names = [""]
-if "time_series_log" not in st.session_state:
-    st.session_state.time_series_log = pd.DataFrame(
-        {"Time Retrieved": [], "Ticker": [], "Interval": [], "Start": [], "End": []}
-    )
-if "line_style" not in st.session_state:
-    st.session_state.line_style = "Candlestick"
+# ---- Session state ----
+ss = st.session_state
+ss.setdefault("loaded_time_series", [])
+ss.setdefault("loaded_time_series_names", ["— choose a series —"])
+ss.setdefault(
+    "time_series_log",
+    pd.DataFrame({"Time Retrieved": [], "Ticker": [], "Interval": [], "Start": [], "End": []}),
+)
+ss.setdefault("line_style", "Candlestick")
 
 st.divider()
-_, settings_column = st.columns(spec=[0.75, 0.25])
-popover_container = settings_column.container(horizontal=True)
+_, retrieve_column, plot_settings_column = st.columns(spec=[0.5, 0.25, 0.25])
 
-with popover_container.popover("Retrieve Data", use_container_width=True):
+with retrieve_column.popover("Retrieve Data", use_container_width=True):
     st.caption("Retrieval log")
-    st.dataframe(st.session_state.time_series_log, use_container_width=True)
+    st.dataframe(ss.time_series_log, use_container_width=True)
 
     c1, c2, c3, c4, c5 = st.columns(spec=[0.15, 0.2, 0.25, 0.25, 0.15], vertical_alignment="top")
+    today = dt.date.today()
+    default_start = today.replace(year=today.year - 1)
 
     with c1:
         ticker = underlabel(st.text_input, "Ticker", key="ticker_input", placeholder="AAPL")
@@ -75,44 +76,48 @@ with popover_container.popover("Retrieve Data", use_container_width=True):
             key="interval_input",
         )
     with c3:
-        start = underlabel(st.date_input, "Start", key="start_date")
+        start = underlabel(st.date_input, "Start", key="start_date", value=default_start)
     with c4:
-        end = underlabel(st.date_input, "End", key="end_date")
+        end = underlabel(st.date_input, "End", key="end_date", value=today)
 
-    retrieve = c5.button(
-        "Retrieve",
-        type="primary",
-        width="stretch",
-    )
+    retrieve = c5.button("Retrieve", type="primary", use_container_width=True)
 
-    @st.cache_data(show_spinner=False)
+    @st.cache_data(ttl=3600, show_spinner=False)
     def fetch_history(ticker: str, start: dt.date, end: dt.date, interval: str) -> pd.DataFrame:
         t = yf.Ticker(ticker)
         df = t.history(start=start, end=end, interval=interval)
-        if not df.empty:
-            df.index = pd.to_datetime(df.index)
-            keep = [c for c in ["Open", "High", "Low", "Close", "Volume"] if c in df.columns]
-            df = df[keep]
-        return df
+        if df is None or df.empty:
+            return pd.DataFrame()
+        df.index = pd.to_datetime(df.index)
+        keep = [c for c in ["Open", "High", "Low", "Close", "Volume"] if c in df.columns]
+        return df[keep]
 
     if retrieve:
-        if not ticker:
+        tkr = (ticker or "").strip().upper()
+        if not tkr:
             st.info("Enter a ticker first.")
+        elif start > end:
+            st.error("Start date must be on or before End date.")
         else:
-            df = fetch_history(ticker, start, end, interval)
+            try:
+                df = fetch_history(tkr, start, end, interval)
+            except Exception as e:
+                st.error(f"Data request failed: {e}")
+                df = pd.DataFrame()
+
             if df.empty:
                 st.warning("No data returned for that request.")
             else:
-                name = f"| {ticker.upper()} | {interval} | {start:%Y/%m/%d}–{end:%Y/%m/%d} |"
-                st.session_state.loaded_time_series.append(df)
-                st.session_state.loaded_time_series_names.append(name)
-                st.session_state.time_series_log = pd.concat(
+                name = f"| {tkr} | {interval} | {start:%Y/%m/%d}–{end:%Y/%m/%d} |"
+                ss.loaded_time_series.append(df)
+                ss.loaded_time_series_names.append(name)
+                ss.time_series_log = pd.concat(
                     [
-                        st.session_state.time_series_log,
+                        ss.time_series_log,
                         pd.DataFrame(
                             {
-                                "Time Retrieved": [dt.datetime.now()],
-                                "Ticker": [ticker.upper()],
+                                "Time Retrieved": [dt.datetime.now(timezone.utc)],
+                                "Ticker": [tkr],
                                 "Interval": [interval],
                                 "Start": [start],
                                 "End": [end],
@@ -123,36 +128,20 @@ with popover_container.popover("Retrieve Data", use_container_width=True):
                 )
                 st.success(f"Added {name}")
 
-
-with popover_container.popover("Plot Time Series", use_container_width=True):
-    # Selection & style controls moved here too
-    if st.session_state.loaded_time_series:
+with plot_settings_column.popover("Plot Time Series", use_container_width=True):
+    if ss.loaded_time_series:
         st.selectbox(
             "Select a time series to plot",
-            options=range(len(st.session_state.loaded_time_series) + 1),
-            format_func=lambda i: st.session_state.loaded_time_series_names[i],
+            options=range(len(ss.loaded_time_series) + 1),
+            format_func=lambda i: ss.loaded_time_series_names[i],
             key="series_select",
         )
-        st.radio(
-            "Line Style",
-            ["Candlestick", "OHLC"],
-            key="line_style",
-            horizontal=True,
-        )
+        st.radio("Line Style", ["Candlestick", "OHLC"], key="line_style", horizontal=True)
 
-
-if st.session_state.loaded_time_series and st.session_state.get("series_select", 0) != 0:
-    idx = st.session_state.get("series_select", 0) - 1
-    idx = max(0, min(idx, len(st.session_state.loaded_time_series) - 1))
-    df = st.session_state.loaded_time_series[idx]
-    line_style = st.session_state.get("line_style", "Candlestick")
-
-    try:
-        fragment = st.fragment
-    except AttributeError:
-
-        def fragment(func):
-            return func
+if ss.loaded_time_series and ss.get("series_select", 0) != 0:
+    idx = max(0, min(ss["series_select"] - 1, len(ss.loaded_time_series) - 1))
+    df = ss.loaded_time_series[idx]
+    line_style = ss.get("line_style", "Candlestick")
 
     @fragment
     def render_chart(_df: pd.DataFrame, _style: str):
@@ -167,8 +156,9 @@ if st.session_state.loaded_time_series and st.session_state.get("series_select",
             height=600,
             margin=dict(l=8, r=8, t=0, b=8),
             xaxis_rangeslider_visible=False,
+            hovermode="x unified",
+            uirevision="keep-zoom",  # preserve zoom when toggling style
         )
-
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True, config={"displaylogo": False})
 
     render_chart(df, line_style)

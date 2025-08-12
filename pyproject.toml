@@ -9,9 +9,11 @@ description = "Personal interactive portfolio and study materials"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-  "streamlit>=1.33",
+  "streamlit==1.48.0",
   "pandas>=2.2",
   "numpy>=1.26",
+  "plotly>=5.18",
+  "yfinance>=0.2",
 ]
 
 [project.optional-dependencies]
@@ -26,12 +28,20 @@ dev = [
   "jupytext>=1.16", 
 ]
 
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py310"
-lint.select = ["E","F","I","B","UP"]
-lint.ignore = ["E203","E501"]  # let black handle long lines
 src = ["src"]
+
+[tool.ruff.lint]
+select = ["E","F","I","B","UP"]
+ignore = ["E203","E501"]
 
 [tool.black]
 line-length = 100

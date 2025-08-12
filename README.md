@@ -1,1 +1,26 @@
-This is a work-in-progress interactive portfolio.
+# Interactive Portfolio
+
+A Streamlit app for an interactive personal portfolio with time-series retrieval and Plotly visualization.
+
+## Quickstart
+
+**Requirements:** Python 3.10+
+
+```bash
+# clone & enter
+git clone <your-repo-url>
+cd <your-repo>
+
+# (recommended) create & activate a venv
+python -m venv .venv
+# Windows
+.venv\Scripts\activate
+# macOS/Linux
+source .venv/bin/activate
+
+# install (dev extras optional)
+python -m pip install -U pip
+python -m pip install -e .[dev]
+
+# run the app
+streamlit run src/interactive_portfolio/app/portfolio.py
