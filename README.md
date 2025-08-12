@@ -23,7 +23,8 @@ python -m pip install -U pip
 python -m pip install -e .[dev]
 
 # run the app
-streamlit run src/interactive_portfolio/app/portfolio.py
+streamlit run src/interactive_portfolio/app/portfolio.py```
+
 
 ## Configuration
 
@@ -41,12 +42,12 @@ This repo includes two templates you can copy into place:
 # Windows
 ```powershell
 Copy-Item .streamlit\config.dev.toml .streamlit\config.toml -Force
-streamlit run src\interactive_portfolio\app\portfolio.py
+streamlit run src\interactive_portfolio\app\portfolio.py```
 
 # macOS/Linux
 ```bash
 cp .streamlit/config.dev.toml .streamlit/config.toml
-streamlit run src/interactive_portfolio/app/portfolio.py
+streamlit run src/interactive_portfolio/app/portfolio.py```
 
 
 ### Use the prod config (servers/containers/CI)
@@ -54,9 +55,9 @@ streamlit run src/interactive_portfolio/app/portfolio.py
 # Windows
 ```powershell
 Copy-Item .streamlit\config.prod.toml .streamlit\config.toml -Force
-streamlit run src\interactive_portfolio\app\portfolio.py
+streamlit run src\interactive_portfolio\app\portfolio.py```
 
 # macOS/Linux
 ```bash
 cp .streamlit/config.prod.toml .streamlit/config.toml
-streamlit run src/interactive_portfolio/app/portfolio.py
+streamlit run src/interactive_portfolio/app/portfolio.py```
