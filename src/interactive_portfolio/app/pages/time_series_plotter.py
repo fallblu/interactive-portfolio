@@ -48,7 +48,7 @@ def underlabel(widget_fn, label, *args, **kwargs):
 # ---- Session state ----
 ss = st.session_state
 ss.setdefault("loaded_time_series", [])
-ss.setdefault("loaded_time_series_names", ["— choose a series —"])
+ss.setdefault("loaded_time_series_names", ["None Selected"])
 ss.setdefault(
     "time_series_log",
     pd.DataFrame({"Time Retrieved": [], "Ticker": [], "Interval": [], "Start": [], "End": []}),
@@ -108,7 +108,7 @@ with retrieve_column.popover("Retrieve Data", use_container_width=True):
             if df.empty:
                 st.warning("No data returned for that request.")
             else:
-                name = f"| {tkr} | {interval} | {start:%Y/%m/%d}–{end:%Y/%m/%d} |"
+                name = f"{tkr} | {interval} | {start:%Y/%m/%d}–{end:%Y/%m/%d}"
                 ss.loaded_time_series.append(df)
                 ss.loaded_time_series_names.append(name)
                 ss.time_series_log = pd.concat(
