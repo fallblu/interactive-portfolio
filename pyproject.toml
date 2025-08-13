@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "interactive-portfolio"
-dynamic = ["version"]
+version = "0.0.1"
 description = "Personal interactive portfolio and study materials"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -33,12 +33,6 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
-[tool.setuptools_scm]
-# Tag format: 1.2.3 or v1.2.3
-version_scheme = "semver"
-local_scheme = "no-local-version"     # avoid +gHASH in wheels
-fallback_version = "v0.0.0"            # used when not in a git repo (e.g., zip)
 
 [tool.ruff]
 line-length = 100
